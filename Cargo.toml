@@ -6,3 +6,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+uuid = "0.8"
+tokio = { version = "1.12", features = ["macros", "rt-multi-thread"] }
+tokio-cron-scheduler = "0.2"
