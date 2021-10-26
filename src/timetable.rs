@@ -3,6 +3,15 @@ pub struct Timetable {
     pub activities: Vec<Activity>,
 }
 
+impl Timetable {
+    pub fn new(name: String, activities: Vec<Activity>) -> Timetable {
+        Timetable {
+            name,
+            activities,
+        }
+    }
+}
+
 pub enum Activity {
     Regular {
         weekday: Weekday
