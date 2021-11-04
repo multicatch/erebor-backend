@@ -5,8 +5,7 @@ use std::sync::mpsc::Sender;
 use tokio::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use uuid::Uuid;
-
-use crate::repository::TimetablePacket;
+use crate::timetable::repository::TimetablePacket;
 
 pub trait TimetableSyncScheduler {
     fn register<J>(&mut self, time: &str, job: J, tx: Sender<TimetablePacket>) -> Result<(), Box<dyn std::error::Error + '_>>

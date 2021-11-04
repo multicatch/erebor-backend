@@ -4,6 +4,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 use crate::timetable::Timetable;
+use std::process::exit;
 
 #[derive(Eq, PartialEq, Hash)]
 pub struct TimetableId(pub String);
@@ -24,6 +25,10 @@ impl TimetableRepository {
     pub fn insert(&mut self, id: TimetableId, timetable: Timetable) {
         self.timetables.insert(id, timetable);
     }
+
+    pub fn get(&self, id: TimetableId) -> Option<&Timetable> {
+        self.timetables.get(&id)
+    }
 }
 
 pub fn listen_for_timetables(repository: TimetableRepository) -> (Arc<Mutex<TimetableRepository>>, Sender<TimetablePacket>) {
@@ -32,8 +37,16 @@ pub fn listen_for_timetables(repository: TimetableRepository) -> (Arc<Mutex<Time
     let result = repo_arc.clone();
     thread::spawn(move || {
         loop {
-            let timetable = rx.recv().unwrap();
-            repo_arc.lock().unwrap().insert(timetable.0, timetable.1);
+            let recv = rx.recv();
+            match recv {
+                Ok(timetable) => {
+                    repo_arc.lock().unwrap().insert(timetable.0, timetable.1);
+                },
+                Err(e) => {
+                    println!("MPSC channel dropped.");
+                    exit(255);
+                }
+            }
         }
     });
 
