@@ -11,9 +11,10 @@ async fn main() {
         sched.start().await;
     });
 
-    let api = path!("timetable" / String)
+    let timetable_repo = repository.clone();
+    let timetable = path!("timetable" / String)
         .map(move |id: String| {
-            let timetable = repository.get(TimetableId(id));
+            let timetable = timetable_repo.get(TimetableId(id));
             match timetable {
                 Some(value) => warp::reply::with_status(
                     serde_json::to_string(&value).unwrap(),
@@ -26,7 +27,16 @@ async fn main() {
             }
         });
 
-    warp::serve(api)
+    let all_timetables = path!("timetable")
+        .map(move || {
+            let timetables = repository.available();
+            warp::reply::with_status(
+                serde_json::to_string(&timetables).unwrap(),
+                StatusCode::OK
+            )
+    });
+
+    warp::serve(timetable.or(all_timetables))
         .run(([0, 0, 0, 0], 3030))
         .await;
 }

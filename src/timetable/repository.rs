@@ -3,11 +3,13 @@ use std::process::exit;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
+use serde::{Deserialize, Serialize};
+
 use crate::timetable::Timetable;
 
 pub mod inmemory;
 
-#[derive(Eq, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
 pub struct TimetableId(pub String);
 
 pub struct TimetablePacket(pub TimetableId, pub Timetable);
@@ -20,6 +22,7 @@ pub trait TimetableConsumer {
 
 pub trait TimetableProvider {
     fn get(&self, id: TimetableId) -> Option<Timetable>;
+    fn available(&self) -> Vec<TimetableId>;
 }
 
 #[derive(Clone)]
@@ -40,6 +43,12 @@ impl TimetableRepository {
 
     pub fn get(&self, id: TimetableId) -> Option<&Timetable> {
         self.timetables.get(&id)
+    }
+
+    pub fn available(&self) -> Vec<TimetableId> {
+        self.timetables.iter().map(|(key, _)| {
+            key.clone()
+        }).collect()
     }
 }
 

@@ -18,6 +18,10 @@ impl TimetableProvider for InMemoryRepo {
         let guard = self.local.lock().unwrap();
         guard.get(id).cloned()
     }
+
+    fn available(&self) -> Vec<TimetableId> {
+        self.local.lock().unwrap().available()
+    }
 }
 
 impl TimetableConsumer for InMemoryRepo {
