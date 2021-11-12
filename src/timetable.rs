@@ -4,7 +4,7 @@ pub mod api;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Timetable {
     pub name: String,
     pub activities: Vec<Activity>,
@@ -19,7 +19,7 @@ impl Timetable {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Activity {
     Regular {
         weekday: Weekday,
@@ -33,7 +33,7 @@ pub enum Activity {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Weekday {
     Monday,
     Tuesday,

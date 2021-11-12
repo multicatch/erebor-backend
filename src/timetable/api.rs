@@ -1,9 +1,9 @@
-use warp::{path, Filter, Rejection, Reply};
-use std::sync::{Mutex, Arc};
-use crate::timetable::repository::{TimetableRepository, TimetableId};
+use std::sync::{Arc, Mutex};
+
+use warp::{Filter, path};
 use warp::http::StatusCode;
-use std::convert::Infallible;
-use warp::filters::path::Exact;
+
+use crate::timetable::repository::{TimetableId, TimetableRepository};
 
 pub fn timetable_api<F>(repository: Arc<Mutex<TimetableRepository>>)
 {

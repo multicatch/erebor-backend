@@ -1,16 +1,28 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::process::exit;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 use crate::timetable::Timetable;
-use std::process::exit;
 
-#[derive(Eq, PartialEq, Hash)]
+pub mod inmemory;
+
+#[derive(Eq, PartialEq, Hash, Clone)]
 pub struct TimetableId(pub String);
 
 pub struct TimetablePacket(pub TimetableId, pub Timetable);
 
+pub trait CloneableTimetableProvider: TimetableProvider + Clone {}
+
+pub trait TimetableConsumer {
+    fn consume(&mut self, id: TimetableId, timetable: Timetable);
+}
+
+pub trait TimetableProvider {
+    fn get(&self, id: TimetableId) -> Option<Timetable>;
+}
+
+#[derive(Clone)]
 pub struct TimetableRepository {
     timetables: HashMap<TimetableId, Timetable>,
 }
@@ -31,18 +43,24 @@ impl TimetableRepository {
     }
 }
 
-pub fn listen_for_timetables(repository: TimetableRepository) -> (Arc<Mutex<TimetableRepository>>, Sender<TimetablePacket>) {
+impl Default for TimetableRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>) -> Sender<TimetablePacket> {
     let (tx, rx) = channel::<TimetablePacket>();
-    let repo_arc = Arc::new(Mutex::new(repository));
-    let result = repo_arc.clone();
+
     thread::spawn(move || {
+        let mut publisher = publisher;
         loop {
             let recv = rx.recv();
             match recv {
                 Ok(timetable) => {
-                    repo_arc.lock().unwrap().insert(timetable.0, timetable.1);
+                    publisher.consume(timetable.0, timetable.1);
                 },
-                Err(e) => {
+                Err(_) => {
                     println!("MPSC channel dropped.");
                     exit(255);
                 }
@@ -50,5 +68,5 @@ pub fn listen_for_timetables(repository: TimetableRepository) -> (Arc<Mutex<Time
         }
     });
 
-    (result, tx)
+    tx
 }
