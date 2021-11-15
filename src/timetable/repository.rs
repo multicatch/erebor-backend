@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::process::exit;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Sender, RecvError};
 use std::thread;
 
 use serde::{Deserialize, Serialize};
@@ -58,24 +58,40 @@ impl Default for TimetableRepository {
     }
 }
 
-pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>) -> Sender<TimetablePacket> {
+pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>, exit_on_failure: bool) -> Sender<TimetablePacket> {
+    debug!("Initializing timetable listener.");
     let (tx, rx) = channel::<TimetablePacket>();
 
     thread::spawn(move || {
+        info!("Listening for timetable updates, exit_on_failure: [{}]", exit_on_failure);
         let mut publisher = publisher;
         loop {
             let recv = rx.recv();
-            match recv {
-                Ok(timetable) => {
-                    publisher.consume(timetable.0, timetable.1);
-                },
-                Err(_) => {
-                    println!("MPSC channel dropped.");
-                    exit(255);
-                }
-            }
+            publisher = receive_timetable(recv, publisher, exit_on_failure)
         }
     });
 
+    debug!("Timetable initialization complete.");
     tx
+}
+
+fn receive_timetable(recv: Result<TimetablePacket, RecvError>,
+                     publisher: Box<dyn TimetableConsumer + Send>,
+                     exit_on_failure: bool
+) -> Box<dyn TimetableConsumer + Send> {
+    match recv {
+        Ok(timetable) => {
+            let mut publisher = publisher;
+            trace!("Received timetable with id [{}]", timetable.0.0);
+            publisher.consume(timetable.0, timetable.1);
+            publisher
+        },
+        Err(_) => {
+            error!("Critical error during timetable listening - MPSC channel dropped.");
+            if exit_on_failure {
+                exit(255);
+            }
+            publisher
+        }
+    }
 }

@@ -1,15 +1,15 @@
-use erebor_backend::{setup_repository};
+use erebor_backend::run_scheduler;
 use erebor_backend::timetable::repository::{TimetableId, TimetableProvider};
 use warp::{path, Filter};
 use warp::http::StatusCode;
+use log::LevelFilter;
+use erebor_backend::timetable::repository::inmemory::in_memory_repo;
 
 #[tokio::main]
 async fn main() {
-    let (repository, sched) = setup_repository();
+    env_logger::builder().filter_module("erebor_backend", LevelFilter::Trace).init();
 
-    tokio::spawn(async move {
-        sched.start().await;
-    });
+    let repository = run_scheduler(in_memory_repo).unwrap();
 
     let timetable_repo = repository.clone();
     let timetable = path!("timetable" / String)

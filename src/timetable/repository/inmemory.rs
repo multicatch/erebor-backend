@@ -31,6 +31,7 @@ impl TimetableConsumer for InMemoryRepo {
 }
 
 pub fn in_memory_repo() -> (InMemoryRepo, InMemoryRepo) {
+    debug!("Creating in memory repository for timetable.");
     let repository = TimetableRepository::new();
     let repo_arc = Arc::new(Mutex::new(repository));
     let consumer = InMemoryRepo::new(repo_arc.clone());
