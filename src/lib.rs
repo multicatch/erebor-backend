@@ -62,5 +62,5 @@ pub fn setup_repository<C>(consumer: Box<C>, exit_on_failure: bool) -> Result<Jo
 
 pub fn register_provider_jobs(scheduler: &mut JobScheduler, tx: Sender<TimetablePacket>) -> Result<(), SchedulingError> {
     debug!("Registering timetable providers...");
-    scheduler.register("0 0 0 * * * *", sync_moria, tx)
+    scheduler.register("moria", "0 0 0 * * * *", sync_moria, tx)
 }

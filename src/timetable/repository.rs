@@ -6,6 +6,7 @@ use std::thread;
 use serde::{Deserialize, Serialize};
 
 use crate::timetable::Timetable;
+use std::sync::Arc;
 
 pub mod inmemory;
 
@@ -14,7 +15,29 @@ pub struct TimetableId(pub String);
 
 pub struct TimetablePacket(pub TimetableId, pub Timetable);
 
-pub trait CloneableTimetableProvider: TimetableProvider + Clone {}
+#[derive(Clone)]
+pub struct ShareableTimetableProvider {
+    actual: Arc<dyn TimetableProvider + Send + Sync>,
+}
+
+impl ShareableTimetableProvider {
+    pub fn new<T>(actual: T) -> ShareableTimetableProvider
+        where T: TimetableProvider + Send + Sync,
+              T: 'static,
+    {
+        ShareableTimetableProvider { actual: Arc::new(actual) }
+    }
+}
+
+impl TimetableProvider for ShareableTimetableProvider {
+    fn get(&self, id: TimetableId) -> Option<Timetable> {
+        self.actual.get(id)
+    }
+
+    fn available(&self) -> Vec<TimetableId> {
+        self.actual.available()
+    }
+}
 
 pub trait TimetableConsumer {
     fn consume(&mut self, id: TimetableId, timetable: Timetable);
@@ -77,7 +100,7 @@ pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>, exit_
 
 fn receive_timetable(recv: Result<TimetablePacket, RecvError>,
                      publisher: Box<dyn TimetableConsumer + Send>,
-                     exit_on_failure: bool
+                     exit_on_failure: bool,
 ) -> Box<dyn TimetableConsumer + Send> {
     match recv {
         Ok(timetable) => {
@@ -85,7 +108,7 @@ fn receive_timetable(recv: Result<TimetablePacket, RecvError>,
             trace!("Received timetable with id [{}]", timetable.0.0);
             publisher.consume(timetable.0, timetable.1);
             publisher
-        },
+        }
         Err(_) => {
             error!("Critical error during timetable listening - MPSC channel dropped.");
             if exit_on_failure {

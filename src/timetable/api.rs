@@ -1,11 +1,10 @@
-use crate::timetable::repository::inmemory::InMemoryRepo;
-use crate::timetable::repository::{TimetableId, TimetableProvider};
+use crate::timetable::repository::{TimetableId, TimetableProvider, ShareableTimetableProvider};
 use rocket::State;
 use rocket::response::{status, content};
 use rocket::http::Status;
 
 #[get("/timetable")]
-pub fn get_all_timetables(repo: &State<InMemoryRepo>) -> status::Custom<content::Json<String>> {
+pub fn get_all_timetables(repo: &State<ShareableTimetableProvider>) -> status::Custom<content::Json<String>> {
     serde_json::to_string(&repo.available())
         .map(|json|
             status::Custom(Status::Ok, content::Json(json))
@@ -17,7 +16,7 @@ pub fn get_all_timetables(repo: &State<InMemoryRepo>) -> status::Custom<content:
 }
 
 #[get("/timetable/<id>")]
-pub fn get_timetable(repo: &State<InMemoryRepo>, id: &str) -> status::Custom<content::Json<String>> {
+pub fn get_timetable(repo: &State<ShareableTimetableProvider>, id: &str) -> status::Custom<content::Json<String>> {
     let timetable = repo.get(TimetableId(id.to_string()));
 
     timetable
