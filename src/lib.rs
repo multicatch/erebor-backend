@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate rocket;
 
 use std::sync::mpsc::Sender;
 use log::Level::Error;
