@@ -2,7 +2,6 @@ use crate::timetable::repository::{TimetableId, TimetableProvider, ShareableTime
 use rocket::State;
 use rocket::response::{status, content};
 use rocket::http::Status;
-use crate::timetable::Timetable;
 use serde::Serialize;
 use log::Level;
 

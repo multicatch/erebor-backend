@@ -1,6 +1,7 @@
-use crate::timetable::repository::{TimetableConsumer, TimetableProvider, TimetableRepository, TimetableId};
+use crate::timetable::repository::{TimetableConsumer, TimetableProvider, TimetableId};
 use std::sync::{Mutex, Arc};
 use crate::timetable::Timetable;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct InMemoryRepo {
@@ -8,8 +9,49 @@ pub struct InMemoryRepo {
 }
 
 impl InMemoryRepo {
-    pub fn new(repo: Arc<Mutex<TimetableRepository>>) -> InMemoryRepo {
+    fn new(repo: Arc<Mutex<TimetableRepository>>) -> InMemoryRepo {
         InMemoryRepo { local: repo }
+    }
+}
+
+#[derive(Clone)]
+struct TimetableRepository {
+    timetables: HashMap<TimetableId, Timetable>,
+    available: HashMap<String, Vec<TimetableId>>,
+}
+
+impl TimetableRepository {
+    pub fn new() -> TimetableRepository {
+        TimetableRepository {
+            timetables: HashMap::new(),
+            available: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, id: TimetableId, timetable: Timetable) {
+        self.timetables.insert(id.clone(), timetable);
+        let available = self.available.get(&id.namespace)
+            .map(|v| v.clone())
+            .unwrap_or_else(|| vec![id.clone()]);
+        self.available.insert(id.namespace.clone(), available);
+    }
+
+    pub fn get(&self, id: TimetableId) -> Option<&Timetable> {
+        self.timetables.get(&id)
+    }
+
+    pub fn namespaces(&self) -> Vec<String> {
+        self.available.keys().cloned().into_iter().collect()
+    }
+
+    pub fn available_timetables(&self, namespace: &str) -> Option<&Vec<TimetableId>> {
+        self.available.get(namespace)
+    }
+}
+
+impl Default for TimetableRepository {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::process::exit;
 use std::sync::mpsc::{channel, Sender, RecvError};
 use std::thread;
@@ -60,47 +59,6 @@ pub trait TimetableProvider {
     fn get(&self, id: TimetableId) -> Option<Timetable>;
     fn namespaces(&self) -> Vec<String>;
     fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>>;
-}
-
-#[derive(Clone)]
-pub struct TimetableRepository {
-    timetables: HashMap<TimetableId, Timetable>,
-    available: HashMap<String, Vec<TimetableId>>,
-}
-
-impl TimetableRepository {
-    pub fn new() -> TimetableRepository {
-        TimetableRepository {
-            timetables: HashMap::new(),
-            available: HashMap::new(),
-        }
-    }
-
-    pub fn insert(&mut self, id: TimetableId, timetable: Timetable) {
-        self.timetables.insert(id.clone(), timetable);
-        let available = self.available.get(&id.namespace)
-            .map(|v| v.clone())
-            .unwrap_or_else(|| vec![id.clone()]);
-        self.available.insert(id.namespace.clone(), available);
-    }
-
-    pub fn get(&self, id: TimetableId) -> Option<&Timetable> {
-        self.timetables.get(&id)
-    }
-
-    pub fn namespaces(&self) -> Vec<String> {
-        self.available.keys().cloned().into_iter().collect()
-    }
-
-    pub fn available_timetables(&self, namespace: &str) -> Option<&Vec<TimetableId>> {
-        self.available.get(namespace)
-    }
-}
-
-impl Default for TimetableRepository {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>, exit_on_failure: bool) -> Sender<TimetablePacket> {
