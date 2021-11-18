@@ -2,7 +2,7 @@ use erebor_backend::run_scheduler;
 use erebor_backend::timetable::repository::{ShareableTimetableProvider};
 use log::LevelFilter;
 use erebor_backend::timetable::repository::inmemory::in_memory_repo;
-use erebor_backend::timetable::api::{get_all_timetables, get_timetable};
+use erebor_backend::timetable::api::{get_all_namespaces, get_all_timetables, get_timetable};
 use rocket::routes;
 
 #[rocket::main]
@@ -16,7 +16,7 @@ async fn main() {
 
     rocket::build()
         .manage(ShareableTimetableProvider::new(repository))
-        .mount("/", routes![get_all_timetables, get_timetable])
+        .mount("/", routes![get_all_namespaces, get_all_timetables, get_timetable])
         .launch()
         .await;
 }

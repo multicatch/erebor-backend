@@ -11,7 +11,16 @@ use std::sync::Arc;
 pub mod inmemory;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
-pub struct TimetableId(pub String);
+pub struct TimetableId {
+    pub namespace: String,
+    pub id: String
+}
+
+impl TimetableId {
+    pub fn new(namespace: String, id: String) -> TimetableId {
+        TimetableId { namespace, id }
+    }
+}
 
 pub struct TimetablePacket(pub TimetableId, pub Timetable);
 
@@ -34,8 +43,12 @@ impl TimetableProvider for ShareableTimetableProvider {
         self.actual.get(id)
     }
 
-    fn available(&self) -> Vec<TimetableId> {
-        self.actual.available()
+    fn namespaces(&self) -> Vec<String> {
+        self.actual.namespaces()
+    }
+
+    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>> {
+        self.actual.available_timetables(namespace)
     }
 }
 
@@ -45,33 +58,42 @@ pub trait TimetableConsumer {
 
 pub trait TimetableProvider {
     fn get(&self, id: TimetableId) -> Option<Timetable>;
-    fn available(&self) -> Vec<TimetableId>;
+    fn namespaces(&self) -> Vec<String>;
+    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>>;
 }
 
 #[derive(Clone)]
 pub struct TimetableRepository {
     timetables: HashMap<TimetableId, Timetable>,
+    available: HashMap<String, Vec<TimetableId>>,
 }
 
 impl TimetableRepository {
     pub fn new() -> TimetableRepository {
         TimetableRepository {
-            timetables: HashMap::new()
+            timetables: HashMap::new(),
+            available: HashMap::new(),
         }
     }
 
     pub fn insert(&mut self, id: TimetableId, timetable: Timetable) {
-        self.timetables.insert(id, timetable);
+        self.timetables.insert(id.clone(), timetable);
+        let available = self.available.get(&id.namespace)
+            .map(|v| v.clone())
+            .unwrap_or_else(|| vec![id.clone()]);
+        self.available.insert(id.namespace.clone(), available);
     }
 
     pub fn get(&self, id: TimetableId) -> Option<&Timetable> {
         self.timetables.get(&id)
     }
 
-    pub fn available(&self) -> Vec<TimetableId> {
-        self.timetables.iter().map(|(key, _)| {
-            key.clone()
-        }).collect()
+    pub fn namespaces(&self) -> Vec<String> {
+        self.available.keys().cloned().into_iter().collect()
+    }
+
+    pub fn available_timetables(&self, namespace: &str) -> Option<&Vec<TimetableId>> {
+        self.available.get(namespace)
     }
 }
 
@@ -105,7 +127,7 @@ fn receive_timetable(recv: Result<TimetablePacket, RecvError>,
     match recv {
         Ok(timetable) => {
             let mut publisher = publisher;
-            trace!("Received timetable with id [{}]", timetable.0.0);
+            trace!("Received timetable with id [{}:{}]", timetable.0.namespace, timetable.0.id);
             publisher.consume(timetable.0, timetable.1);
             publisher
         }

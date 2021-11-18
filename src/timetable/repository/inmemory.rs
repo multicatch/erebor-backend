@@ -19,8 +19,14 @@ impl TimetableProvider for InMemoryRepo {
         guard.get(id).cloned()
     }
 
-    fn available(&self) -> Vec<TimetableId> {
-        self.local.lock().unwrap().available()
+    fn namespaces(&self) -> Vec<String> {
+        let repo = self.local.lock().unwrap();
+        repo.namespaces()
+    }
+
+    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>> {
+        let repo = self.local.lock().unwrap();
+        repo.available_timetables(namespace).cloned()
     }
 }
 

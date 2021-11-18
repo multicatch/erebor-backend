@@ -8,7 +8,7 @@ use crate::timetable::repository::{TimetablePacket, TimetableId};
 
 pub fn sync_moria(_uuid: Uuid, _sched: JobScheduler, tx: Sender<TimetablePacket>) {
     tx.send(TimetablePacket(
-        TimetableId("id".to_string()),
+        TimetableId::new("moria".to_string(), "id".to_string()),
         Timetable::new("name".to_string(), vec![])
     ));
 }
