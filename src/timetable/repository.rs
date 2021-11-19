@@ -2,26 +2,10 @@ use std::process::exit;
 use std::sync::mpsc::{channel, Sender, RecvError};
 use std::thread;
 
-use serde::{Deserialize, Serialize};
-
-use crate::timetable::Timetable;
+use crate::timetable::{Timetable, TimetableId, TimetableDescriptor};
 use std::sync::Arc;
 
 pub mod inmemory;
-
-#[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
-pub struct TimetableId {
-    pub namespace: String,
-    pub id: String
-}
-
-impl TimetableId {
-    pub fn new(namespace: String, id: String) -> TimetableId {
-        TimetableId { namespace, id }
-    }
-}
-
-pub struct TimetablePacket(pub TimetableId, pub Timetable);
 
 #[derive(Clone)]
 pub struct ShareableTimetableProvider {
@@ -46,31 +30,31 @@ impl TimetableProvider for ShareableTimetableProvider {
         self.actual.namespaces()
     }
 
-    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>> {
+    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableDescriptor>> {
         self.actual.available_timetables(namespace)
     }
 }
 
 pub trait TimetableConsumer {
-    fn consume(&mut self, id: TimetableId, timetable: Timetable);
+    fn consume(&mut self, timetable: Timetable);
 }
 
 pub trait TimetableProvider {
     fn get(&self, id: TimetableId) -> Option<Timetable>;
     fn namespaces(&self) -> Vec<String>;
-    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>>;
+    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableDescriptor>>;
 }
 
-pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>, exit_on_failure: bool) -> Sender<TimetablePacket> {
+pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>, exit_on_failure: bool) -> Sender<Timetable> {
     debug!("Initializing timetable listener.");
-    let (tx, rx) = channel::<TimetablePacket>();
+    let (tx, rx) = channel::<Timetable>();
 
     thread::spawn(move || {
         info!("Listening for timetable updates, exit_on_failure: [{}]", exit_on_failure);
-        let mut publisher = publisher;
+        let mut consumer = publisher;
         loop {
             let recv = rx.recv();
-            publisher = receive_timetable(recv, publisher, exit_on_failure)
+            consumer = receive_timetable(recv, consumer, exit_on_failure)
         }
     });
 
@@ -78,23 +62,23 @@ pub fn listen_for_timetables(publisher: Box<dyn TimetableConsumer + Send>, exit_
     tx
 }
 
-fn receive_timetable(recv: Result<TimetablePacket, RecvError>,
-                     publisher: Box<dyn TimetableConsumer + Send>,
+fn receive_timetable(recv: Result<Timetable, RecvError>,
+                     consumer: Box<dyn TimetableConsumer + Send>,
                      exit_on_failure: bool,
 ) -> Box<dyn TimetableConsumer + Send> {
     match recv {
         Ok(timetable) => {
-            let mut publisher = publisher;
-            trace!("Received timetable with id [{}:{}]", timetable.0.namespace, timetable.0.id);
-            publisher.consume(timetable.0, timetable.1);
-            publisher
+            let mut consumer = consumer;
+            trace!("Received timetable with id [{}]", timetable.descriptor.id);
+            consumer.consume(timetable);
+            consumer
         }
         Err(_) => {
             error!("Critical error during timetable listening - MPSC channel dropped.");
             if exit_on_failure {
                 exit(255);
             }
-            publisher
+            consumer
         }
     }
 }

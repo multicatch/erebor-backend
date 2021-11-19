@@ -1,15 +1,16 @@
-use crate::timetable::repository::{TimetableId, TimetableProvider, ShareableTimetableProvider};
+use crate::timetable::repository::{TimetableProvider, ShareableTimetableProvider};
 use rocket::State;
 use rocket::response::{status, content};
 use rocket::http::Status;
 use serde::Serialize;
 use log::Level;
+use crate::timetable::TimetableId;
 
 #[get("/timetable")]
 pub fn get_all_namespaces(repo: &State<ShareableTimetableProvider>) -> status::Custom<content::Json<String>> {
     serialize_response(
         repo.namespaces(),
-        || format!("available namespaces")
+        || "available namespaces".to_string()
     )
 }
 

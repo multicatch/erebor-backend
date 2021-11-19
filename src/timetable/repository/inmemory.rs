@@ -1,6 +1,6 @@
 use crate::timetable::repository::{TimetableConsumer, TimetableProvider, TimetableId};
 use std::sync::{Mutex, Arc};
-use crate::timetable::Timetable;
+use crate::timetable::{Timetable, TimetableDescriptor};
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -17,7 +17,7 @@ impl InMemoryRepo {
 #[derive(Clone)]
 struct TimetableRepository {
     timetables: HashMap<TimetableId, Timetable>,
-    available: HashMap<String, Vec<TimetableId>>,
+    available: HashMap<String, Vec<TimetableDescriptor>>,
 }
 
 impl TimetableRepository {
@@ -29,11 +29,16 @@ impl TimetableRepository {
     }
 
     pub fn insert(&mut self, id: TimetableId, timetable: Timetable) {
-        self.timetables.insert(id.clone(), timetable);
-        let available = self.available.get(&id.namespace)
-            .map(|v| v.clone())
-            .unwrap_or_else(|| vec![id.clone()]);
-        self.available.insert(id.namespace.clone(), available);
+        let namespace = id.namespace.clone();
+        let descriptor = timetable.descriptor.clone();
+
+        self.timetables.insert(id, timetable);
+
+        if let Some(vec) = self.available.get_mut(&namespace) {
+            vec.push(descriptor);
+        } else {
+            self.available.insert(namespace, vec![descriptor]);
+        }
     }
 
     pub fn get(&self, id: TimetableId) -> Option<&Timetable> {
@@ -44,7 +49,7 @@ impl TimetableRepository {
         self.available.keys().cloned().into_iter().collect()
     }
 
-    pub fn available_timetables(&self, namespace: &str) -> Option<&Vec<TimetableId>> {
+    pub fn available_timetables(&self, namespace: &str) -> Option<&Vec<TimetableDescriptor>> {
         self.available.get(namespace)
     }
 }
@@ -66,15 +71,15 @@ impl TimetableProvider for InMemoryRepo {
         repo.namespaces()
     }
 
-    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableId>> {
+    fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableDescriptor>> {
         let repo = self.local.lock().unwrap();
         repo.available_timetables(namespace).cloned()
     }
 }
 
 impl TimetableConsumer for InMemoryRepo {
-    fn consume(&mut self, id: TimetableId, timetable: Timetable) {
-        self.local.lock().unwrap().insert(id, timetable)
+    fn consume(&mut self, timetable: Timetable) {
+        self.local.lock().unwrap().insert(timetable.descriptor.id.clone(), timetable)
     }
 }
 

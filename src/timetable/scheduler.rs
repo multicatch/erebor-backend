@@ -5,8 +5,8 @@ use std::sync::mpsc::Sender;
 use tokio::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use uuid::Uuid;
-use crate::timetable::repository::TimetablePacket;
 use std::fmt::{Debug, Formatter, Display};
+use crate::timetable::Timetable;
 
 #[derive(Debug)]
 pub enum SchedulingError {
@@ -24,15 +24,15 @@ impl Display for SchedulingError {
 impl Error for SchedulingError {}
 
 pub trait TimetableSyncScheduler {
-    fn register<J>(&mut self, name: &str, time: &str, job: J, tx: Sender<TimetablePacket>) -> Result<(), SchedulingError>
+    fn register<J>(&mut self, name: &str, time: &str, job: J, tx: Sender<Timetable>) -> Result<(), SchedulingError>
         where J: 'static,
-              J: FnMut(Uuid, JobScheduler, Sender<TimetablePacket>) + Send + Sync + Clone ;
+              J: FnMut(Uuid, JobScheduler, Sender<Timetable>) + Send + Sync + Clone ;
 }
 
 impl TimetableSyncScheduler for JobScheduler {
-    fn register<J>(&mut self, name: &str, time: &str, job: J, tx: Sender<TimetablePacket>) -> Result<(), SchedulingError>
+    fn register<J>(&mut self, name: &str, time: &str, job: J, tx: Sender<Timetable>) -> Result<(), SchedulingError>
         where J: 'static,
-              J: FnMut(Uuid, JobScheduler, Sender<TimetablePacket>) + Send + Sync + Clone {
+              J: FnMut(Uuid, JobScheduler, Sender<Timetable>) + Send + Sync + Clone {
         trace!("Registering a job named [{}]...", name);
         register_one_shot(self, name, job.clone(), tx.clone())?;
         register_periodic(self, name, time, job, tx)?;
@@ -41,9 +41,9 @@ impl TimetableSyncScheduler for JobScheduler {
     }
 }
 
-fn register_one_shot<J>(scheduler: &mut JobScheduler, name: &str, job: J, tx: Sender<TimetablePacket>) -> Result<(), SchedulingError>
+fn register_one_shot<J>(scheduler: &mut JobScheduler, name: &str, job: J, tx: Sender<Timetable>) -> Result<(), SchedulingError>
     where J: 'static,
-          J: FnMut(Uuid, JobScheduler, Sender<TimetablePacket>) + Send + Sync + Clone {
+          J: FnMut(Uuid, JobScheduler, Sender<Timetable>) + Send + Sync + Clone {
 
     let tx = Arc::new(Mutex::new(tx));
     let tx = move || tx.lock().unwrap().clone();
@@ -59,9 +59,9 @@ fn register_one_shot<J>(scheduler: &mut JobScheduler, name: &str, job: J, tx: Se
     scheduler.add(one_shot).map_err(|_| SchedulingError::OneShotErr)
 }
 
-fn register_periodic<J>(scheduler: &mut JobScheduler, name: &str, time: &str, job: J, tx: Sender<TimetablePacket>) -> Result<(), SchedulingError>
+fn register_periodic<J>(scheduler: &mut JobScheduler, name: &str, time: &str, job: J, tx: Sender<Timetable>) -> Result<(), SchedulingError>
     where J: 'static,
-          J: FnMut(Uuid, JobScheduler, Sender<TimetablePacket>) + Send + Sync + Clone {
+          J: FnMut(Uuid, JobScheduler, Sender<Timetable>) + Send + Sync + Clone {
 
     let tx = Arc::new(Mutex::new(tx));
     let tx = move || tx.lock().unwrap().clone();
