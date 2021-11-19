@@ -63,17 +63,37 @@ impl Display for TimetableId {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub enum Activity {
+pub struct Activity {
+    pub name: String,
+    pub teacher: String,
+    pub occurrence: ActivityOccurrence,
+    pub group: ActivityGroup,
+    pub time: ActivityTime,
+    pub room: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub enum ActivityOccurrence {
     Regular {
         weekday: Weekday,
-        name: String,
-        teacher: String,
     },
     Special {
         date: String,
-        name: String,
-        teacher: String,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivityGroup {
+    pub symbol: String,
+    pub name: String,
+    pub id: u8,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivityTime {
+    pub start_time: String,
+    pub end_time: String,
+    pub duration: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

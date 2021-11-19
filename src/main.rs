@@ -10,7 +10,7 @@ async fn main() {
     env_logger::builder()
         .filter_module("erebor_backend", LevelFilter::Trace)
         .filter_module("rocket", LevelFilter::Info)
-        .filter_module("reqwest", LevelFilter::Info)
+        .filter_module("reqwest", LevelFilter::Debug)
         .init();
 
     let repository = run_scheduler(in_memory_repo).unwrap();
