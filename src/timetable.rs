@@ -7,13 +7,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Timetable {
     pub name: String,
+    pub variant: TimetableVariant,
     pub activities: Vec<Activity>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub enum TimetableVariant {
+    Semester(u8),
+    Year(u8),
+    Unique
+}
+
 impl Timetable {
-    pub fn new(name: String, activities: Vec<Activity>) -> Timetable {
+    pub fn new(name: String, variant: TimetableVariant, activities: Vec<Activity>) -> Timetable {
         Timetable {
             name,
+            variant,
             activities,
         }
     }
