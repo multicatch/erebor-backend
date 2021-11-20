@@ -15,9 +15,14 @@ async fn main() {
 
     let repository = run_scheduler(in_memory_repo).unwrap();
 
-    rocket::build()
+    let result = rocket::build()
         .manage(ShareableTimetableProvider::new(repository))
         .mount("/", routes![get_all_namespaces, get_all_timetables, get_timetable])
         .launch()
         .await;
+
+    match result {
+        Ok(_) => println!("Server finished gracefully."),
+        Err(e) => eprintln!("Server crashed. {}", e),
+    }
 }
