@@ -65,7 +65,7 @@ impl Display for TimetableId {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Activity {
     pub name: String,
-    pub teacher: String,
+    pub teacher: Option<String>,
     pub occurrence: ActivityOccurrence,
     pub group: ActivityGroup,
     pub time: ActivityTime,
