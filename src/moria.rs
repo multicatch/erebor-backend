@@ -197,6 +197,8 @@ fn send_timetable(tx: &Sender<Timetable>, id: TimetableId, name: String, activit
 }
 
 fn parse_variant(name: String) -> (String, TimetableVariant) {
+    let name = name.trim();
+
     if name.chars()
         .nth(1)
         .map(|c| c == ' ')
@@ -208,10 +210,10 @@ fn parse_variant(name: String) -> (String, TimetableVariant) {
             .to_digit(10);
 
         if let Some(year) = year {
-            return (name[2..].to_string(), TimetableVariant::Year(year))
+            return (name[2..].trim().to_string(), TimetableVariant::Year(year))
         }
     }
-    (name, TimetableVariant::Unique)
+    (name.to_string(), TimetableVariant::Unique)
 }
 
 #[derive(Deserialize)]
