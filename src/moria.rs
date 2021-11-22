@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use serde::de::DeserializeOwned;
 use std::fmt::{Display, Formatter};
 use reqwest::{Error, RequestBuilder};
+use chrono::Utc;
 
 #[derive(Debug)]
 enum MoriaError {
@@ -178,13 +179,13 @@ fn to_weekday(number: u8) -> Weekday {
 }
 
 fn send_timetable(tx: &Sender<Timetable>, id: TimetableId, name: String, activities: Vec<Activity>) -> bool {
+    let (name, variant) = parse_variant(name);
+
     let timetable = Timetable::new(
-        TimetableDescriptor::new(
-            id,
-            name,
-            TimetableVariant::Unique,
-        ),
-        activities);
+        TimetableDescriptor::new(id, name, variant),
+        activities,
+        Utc::now()
+    );
 
     let result = tx.send(timetable);
 
@@ -193,6 +194,24 @@ fn send_timetable(tx: &Sender<Timetable>, id: TimetableId, name: String, activit
     }
 
     result.is_ok()
+}
+
+fn parse_variant(name: String) -> (String, TimetableVariant) {
+    if name.chars()
+        .nth(1)
+        .map(|c| c == ' ')
+        .unwrap_or(false) {
+
+        let year = name.chars()
+            .nth(0)
+            .unwrap()
+            .to_digit(10);
+
+        if let Some(year) = year {
+            return (name[2..].to_string(), TimetableVariant::Year(year))
+        }
+    }
+    (name, TimetableVariant::Unique)
 }
 
 #[derive(Deserialize)]

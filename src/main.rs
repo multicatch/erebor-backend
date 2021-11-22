@@ -22,7 +22,7 @@ async fn main() {
         .await;
 
     match result {
-        Ok(_) => println!("Server finished gracefully."),
+        Ok(_) => println!("Server finished normally."),
         Err(e) => eprintln!("Server crashed. {}", e),
     }
 }

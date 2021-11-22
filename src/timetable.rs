@@ -4,11 +4,15 @@ pub mod api;
 
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use chrono::{DateTime, Utc};
+use chrono::serde::ts_seconds;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Timetable {
     pub descriptor: TimetableDescriptor,
     pub activities: Vec<Activity>,
+    #[serde(with = "ts_seconds")]
+    pub update_time: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -26,16 +30,17 @@ pub struct TimetableId {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum TimetableVariant {
-    Semester(u8),
-    Year(u8),
+    Semester(u32),
+    Year(u32),
     Unique,
 }
 
 impl Timetable {
-    pub fn new(descriptor: TimetableDescriptor, activities: Vec<Activity>) -> Timetable {
+    pub fn new(descriptor: TimetableDescriptor, activities: Vec<Activity>, update_time: DateTime<Utc>) -> Timetable {
         Timetable {
             descriptor,
             activities,
+            update_time,
         }
     }
 }
