@@ -69,6 +69,7 @@ impl Display for TimetableId {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Activity {
+    pub id: String,
     pub name: String,
     pub teacher: Option<String>,
     pub occurrence: ActivityOccurrence,
@@ -92,6 +93,7 @@ pub struct ActivityGroup {
     pub symbol: String,
     pub name: String,
     pub id: u8,
+    pub number: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

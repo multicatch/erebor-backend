@@ -91,6 +91,7 @@ pub fn sync_moria(_uuid: Uuid, _sched: JobScheduler, tx: Sender<Timetable>) {
 async fn fetch_timetables(tx: Sender<Timetable>) -> Result<(), MoriaError> {
     trace!("Creating moria client...");
     let client = MoriaClient::new();
+    trace!("Fetching timetable list...");
     let timetable_ids: MoriaResult<MoriaArray<MoriaTimetableId>> = client.fetch_timetable_list().await?;
 
     let ids: Vec<_> = timetable_ids
@@ -106,6 +107,7 @@ async fn fetch_timetables(tx: Sender<Timetable>) -> Result<(), MoriaError> {
 
     for (id, name) in ids {
         let id_str = id.id.clone();
+        trace!("Fetching activities for [{}]", id);
         let activities = fetch_activities(&client, &id_str).await?;
 
         if activities.is_empty() {
@@ -136,34 +138,59 @@ async fn fetch_activities(client: &MoriaClient, id: &str) -> Result<Vec<Activity
             if empty_array {
                 warn!("Moria timetable [{}]: Activity [{}] has empty event array and will be ignored.", id, wrapper.id);
             }
-            !empty_array
+
+            let empty = vec![];
+            let empty_students = wrapper.students_array.as_ref()
+                .unwrap_or_else(|| &empty)
+                .is_empty();
+            if empty_students {
+                warn!("Moria timetable [{}]: Activity [{}] has empty student list and will be ignored.", id, wrapper.id);
+            }
+
+            !empty_array && !empty_students
         })
         .map(|wrapper| {
             let event = wrapper.event_array.get(0).unwrap();
-            let teacher = wrapper.teacher_array.get(0);
+            let teacher = wrapper.teacher_array.get(0)
+                .map(|t| t.name.clone());
 
-            Activity {
-                name: wrapper.subject,
-                teacher: teacher.map(|t| t.name.clone()),
-                occurrence: ActivityOccurrence::Regular {
-                    weekday: to_weekday(event.weekday),
-                },
-                group: ActivityGroup {
-                    symbol: wrapper.kind.shortcut.clone(),
-                    name: wrapper.kind.name.clone(),
-                    id: wrapper.kind.id,
-                },
-                time: ActivityTime {
-                    start_time: event.start_time.clone(),
-                    end_time: event.end_time.clone(),
-                    duration: event.length.clone(),
-                },
-                room: Some(event.room.clone()),
-            }
+            let id_num: u32 = id.parse().unwrap_or(0);
+            let student_array = wrapper.students_array
+                .as_ref()
+                .unwrap();
+            let group = student_array
+                .iter()
+                .find(|s| s.id == id_num && s.groups != "1")
+                .map(|s| s.group.clone());
+
+            to_activity(&wrapper, event, teacher, group)
         })
         .collect();
 
     Ok(activities)
+}
+
+fn to_activity(wrapper: &MoriaEventWrapper, event: &MoriaEvent, teacher: Option<String>, group: Option<String>) -> Activity {
+    Activity {
+        id: wrapper.id.to_string(),
+        name: wrapper.subject.clone(),
+        teacher,
+        occurrence: ActivityOccurrence::Regular {
+            weekday: to_weekday(event.weekday),
+        },
+        group: ActivityGroup {
+            symbol: wrapper.kind.shortcut.clone(),
+            name: wrapper.kind.name.clone(),
+            id: wrapper.kind.id,
+            number: group.clone(),
+        },
+        time: ActivityTime {
+            start_time: event.start_time.clone(),
+            end_time: event.end_time.clone(),
+            duration: event.length.clone(),
+        },
+        room: Some(event.room.clone()),
+    }
 }
 
 fn to_weekday(number: u8) -> Weekday {
@@ -238,6 +265,7 @@ struct MoriaEventWrapper {
     event_array: Vec<MoriaEvent>,
     subject: String,
     teacher_array: Vec<MoriaTeacher>,
+    students_array: Option<Vec<MoriaStudentGroup>>,
     #[serde(rename = "type")]
     kind: MoriaEventType,
 }
@@ -261,4 +289,11 @@ struct MoriaEventType {
     name: String,
     id: u8,
     shortcut: String,
+}
+
+#[derive(Deserialize)]
+struct MoriaStudentGroup {
+    id: u32,
+    group: String,
+    groups: String,
 }
