@@ -38,7 +38,7 @@ impl Default for Cors {
     fn default() -> Cors {
         Cors {
            allowed_origins: vec![
-               "https://erebor.vpcloud.eu:8043/".to_string()
+               "https://erebor.vpcloud.eu/".to_string()
            ]
         }
     }
