@@ -86,7 +86,7 @@ fn init_tables(connection: &Connection) -> Result<usize, Error> {
                 group_symbol TEXT NOT NULL,\
                 group_id TEXT NOT NULL,\
                 group_name TEXT NOT NULL,\
-                group_number TEXT NOT NULL,\
+                group_number TEXT,\
                 start_time TEXT NOT NULL,\
                 end_time TEXT NOT NULL,\
                 duration TEXT NOT NULL,\
