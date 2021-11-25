@@ -1,11 +1,13 @@
 use erebor_backend::run_scheduler;
 use erebor_backend::timetable::repository::{ShareableTimetableProvider};
 use log::LevelFilter;
-use erebor_backend::timetable::repository::inmemory::in_memory_repo;
+use erebor_backend::timetable::repository::inmemory::{in_memory_repo, InMemoryRepo};
 use erebor_backend::timetable::api::{get_all_namespaces, get_all_timetables, get_timetable};
 use rocket::{routes, Request, Response};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
+use erebor_backend::timetable::repository::sqlite::SqliteConsumer;
+use rusqlite::Connection;
 
 #[rocket::main]
 async fn main() {
@@ -15,7 +17,7 @@ async fn main() {
         .filter_module("reqwest", LevelFilter::Debug)
         .init();
 
-    let repository = run_scheduler(in_memory_repo).unwrap();
+    let repository = run_scheduler(aaa).unwrap();
 
     let result = rocket::build()
         .manage(ShareableTimetableProvider::new(repository))
@@ -56,4 +58,13 @@ impl Fairing for Cors {
     async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
         res.set_header(Header::new("Access-Control-Allow-Origin", self.allowed_origins.join(", ")));
     }
+}
+
+fn aaa() -> (SqliteConsumer, InMemoryRepo) {
+    let repo = in_memory_repo();
+
+    let con = Connection::open("test.db").unwrap();
+    let result = SqliteConsumer::new(con).unwrap();
+
+    (result, repo.1)
 }

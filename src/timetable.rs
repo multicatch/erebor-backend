@@ -113,3 +113,32 @@ pub enum Weekday {
     Saturday,
     Sunday,
 }
+
+impl From<u8> for Weekday {
+    fn from(number: u8) -> Self {
+        match number {
+            1 => Weekday::Monday,
+            2 => Weekday::Tuesday,
+            3 => Weekday::Wednesday,
+            4 => Weekday::Thursday,
+            5 => Weekday::Friday,
+            6 => Weekday::Saturday,
+            _ => Weekday::Sunday
+        }
+    }
+}
+
+
+impl From<Weekday> for u8 {
+    fn from(weekday: Weekday) -> Self {
+        match weekday {
+            Weekday::Monday => 1,
+            Weekday::Tuesday => 2,
+            Weekday::Wednesday => 3,
+            Weekday::Thursday => 4,
+            Weekday::Friday => 5,
+            Weekday::Saturday => 6,
+            Weekday::Sunday => 7
+        }
+    }
+}

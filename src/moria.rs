@@ -47,7 +47,7 @@ impl MoriaClient {
     }
 
     pub async fn fetch_activities(&self, id: &str) -> Result<MoriaResult<MoriaArray<MoriaEventWrapper>>, MoriaError> {
-        debug!("Fetching activities for {}", id);
+        debug!("Fetching moria activities for [{}]", id);
         let mut params = HashMap::new();
         params.insert("id", id);
 
@@ -107,7 +107,6 @@ async fn fetch_timetables(tx: Sender<Timetable>) -> Result<(), MoriaError> {
 
     for (id, name) in ids {
         let id_str = id.id.clone();
-        trace!("Fetching activities for [{}]", id);
         let activities = fetch_activities(&client, &id_str).await?;
 
         if activities.is_empty() {
@@ -176,7 +175,7 @@ fn to_activity(wrapper: &MoriaEventWrapper, event: &MoriaEvent, teacher: Option<
         name: wrapper.subject.clone(),
         teacher,
         occurrence: ActivityOccurrence::Regular {
-            weekday: to_weekday(event.weekday),
+            weekday: Weekday::from(event.weekday),
         },
         group: ActivityGroup {
             symbol: wrapper.kind.shortcut.clone(),
@@ -190,18 +189,6 @@ fn to_activity(wrapper: &MoriaEventWrapper, event: &MoriaEvent, teacher: Option<
             duration: event.length.clone(),
         },
         room: Some(event.room.clone()),
-    }
-}
-
-fn to_weekday(number: u8) -> Weekday {
-    match number {
-        1 => Weekday::Monday,
-        2 => Weekday::Tuesday,
-        3 => Weekday::Wednesday,
-        4 => Weekday::Thursday,
-        5 => Weekday::Friday,
-        7 => Weekday::Saturday,
-        _ => Weekday::Sunday
     }
 }
 
