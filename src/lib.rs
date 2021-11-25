@@ -16,6 +16,7 @@ use std::panic;
 use crate::timetable::Timetable;
 
 pub mod timetable;
+pub mod httpclient;
 mod moria;
 
 pub fn run_scheduler<F, C, P>(repo: F) -> Result<P, SchedulingError>

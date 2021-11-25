@@ -6,77 +6,46 @@ use uuid::Uuid;
 use crate::timetable::{Timetable, TimetableVariant, TimetableDescriptor, TimetableId, Activity, ActivityGroup, ActivityOccurrence, Weekday, ActivityTime};
 use serde::Deserialize;
 use std::collections::HashMap;
-use serde::de::DeserializeOwned;
-use std::fmt::{Display, Formatter};
-use reqwest::{Error, RequestBuilder};
 use chrono::Utc;
-
-#[derive(Debug)]
-enum MoriaError {
-    RequestError(reqwest::Error),
-    DeserializationError(serde_json::Error),
-}
-
-impl Display for MoriaError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MoriaError::RequestError(e) => write!(f, "Request error. {}", e),
-            MoriaError::DeserializationError(e) => write!(f, "Deserialization error. {}", e),
-        }
-    }
-}
+use tokio::time::Duration;
+use crate::httpclient::{HttpClient, HttpClientError};
 
 struct MoriaClient {
     base_address: String,
-    client: reqwest::Client,
+    client: HttpClient,
 }
 
 impl MoriaClient {
     pub fn new() -> MoriaClient {
         MoriaClient {
             base_address: "http://moria.umcs.lublin.pl/api".to_string(),
-            client: reqwest::Client::new(),
+            client: HttpClient::new(5, Duration::from_millis(300))
         }
     }
 
-    pub async fn fetch_timetable_list(&self) -> Result<MoriaResult<MoriaArray<MoriaTimetableId>>, MoriaError> {
+    pub async fn fetch_timetable_list(&self) -> Result<MoriaResult<MoriaArray<MoriaTimetableId>>, HttpClientError> {
         debug!("Fetching available moria timetables");
-        self.make_request(
-            self.client.get(format!("{}/students_list", self.base_address))
+        let url = format!("{}/students_list", self.base_address);
+
+        self.client.make_retry_request(
+            url.clone(),
+            |client| client.get(url.clone()),
         ).await
     }
 
-    pub async fn fetch_activities(&self, id: &str) -> Result<MoriaResult<MoriaArray<MoriaEventWrapper>>, MoriaError> {
+    pub async fn fetch_activities(&self, id: &str) -> Result<MoriaResult<MoriaArray<MoriaEventWrapper>>, HttpClientError> {
         debug!("Fetching activities for {}", id);
+        let url = format!("{}/activity_list_for_students", self.base_address);
+
         let mut params = HashMap::new();
         params.insert("id", id);
 
-        self.make_request(
-            self.client.get(format!("{}/activity_list_for_students", self.base_address))
-                .json(&params)
+        self.client.make_retry_request(
+            url.clone(),
+            |client| client
+                .get(format!("{}/activity_list_for_students", self.base_address))
+                .json(&params),
         ).await
-    }
-
-    async fn make_request<T>(&self, request: RequestBuilder) -> Result<T, MoriaError>
-        where T: DeserializeOwned {
-        let result = request
-            .send()
-            .await?
-            .text()
-            .await?;
-
-        serde_json::from_str(&result)
-            .map_err(|e| {
-                error!("Cannot deserialize response. {}", e);
-                MoriaError::DeserializationError(e)
-            })
-    }
-}
-
-impl From<reqwest::Error> for MoriaError {
-    fn from(e: Error) -> Self {
-        error!("Request error. {}", e);
-        MoriaError::RequestError(e)
     }
 }
 
@@ -88,7 +57,7 @@ pub fn sync_moria(_uuid: Uuid, _sched: JobScheduler, tx: Sender<Timetable>) {
     });
 }
 
-async fn fetch_timetables(tx: Sender<Timetable>) -> Result<(), MoriaError> {
+async fn fetch_timetables(tx: Sender<Timetable>) -> Result<(), HttpClientError> {
     trace!("Creating moria client...");
     let client = MoriaClient::new();
     trace!("Fetching timetable list...");
@@ -126,7 +95,7 @@ async fn fetch_timetables(tx: Sender<Timetable>) -> Result<(), MoriaError> {
     Ok(())
 }
 
-async fn fetch_activities(client: &MoriaClient, id: &str) -> Result<Vec<Activity>, MoriaError> {
+async fn fetch_activities(client: &MoriaClient, id: &str) -> Result<Vec<Activity>, HttpClientError> {
     let moria_activities: MoriaResult<MoriaArray<MoriaEventWrapper>> = client.fetch_activities(id).await?;
 
     let activities: Vec<Activity> = moria_activities
@@ -211,7 +180,7 @@ fn send_timetable(tx: &Sender<Timetable>, id: TimetableId, name: String, activit
     let timetable = Timetable::new(
         TimetableDescriptor::new(id, name, variant),
         activities,
-        Utc::now()
+        Utc::now(),
     );
 
     let result = tx.send(timetable);
@@ -230,14 +199,13 @@ fn parse_variant(name: String) -> (String, TimetableVariant) {
         .nth(1)
         .map(|c| c == ' ')
         .unwrap_or(false) {
-
         let year = name.chars()
             .nth(0)
             .unwrap()
             .to_digit(10);
 
         if let Some(year) = year {
-            return (name[2..].trim().to_string(), TimetableVariant::Year(year))
+            return (name[2..].trim().to_string(), TimetableVariant::Year(year));
         }
     }
     (name.to_string(), TimetableVariant::Unique)

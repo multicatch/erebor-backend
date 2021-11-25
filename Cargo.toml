@@ -1,13 +1,13 @@
 [package]
 name = "erebor-backend"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 uuid = "0.8"
-tokio = { version = "1.12", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.12", features = ["macros", "rt-multi-thread", "time"] }
 tokio-cron-scheduler = "0.2"
 rocket = { version = "0.5.0-rc.1", features = ["tls"] }
 serde = { version = "1.0", features = ["derive"] }
