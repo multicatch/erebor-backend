@@ -36,7 +36,7 @@ impl TimetableConsumer for SqliteConsumer {
         insert_namespace(&self.connection, &id.namespace);
 
         let timetable_insert = self.connection.prepare(
-            "INSERT OR REPLACE INTO timetable (id, name, variant, variant_value, update_time) VALUES (?, ?, ?, ?, ?);"
+            "INSERT OR REPLACE INTO timetable (id, timetable_id, name, variant, variant_value, update_time, namespace_id) VALUES (?, ?, ?, ?, ?, ?, ?);"
         );
 
         let timetable_insert = timetable_insert
@@ -106,16 +106,6 @@ impl TimetableProvider for SqliteProvider {
             Ok((row.get(0).unwrap(), row.get(1).unwrap(), row.get(2).unwrap(), row.get(3).unwrap()))
         }).unwrap().next()?.unwrap();
 
-        let variant: String = variant;
-        let variant_value: Option<u32> = variant_value;
-        let variant = if variant == "semester".to_string() {
-            TimetableVariant::Semester(variant_value.unwrap())
-        } else if variant == "year".to_string() {
-            TimetableVariant::Year(variant_value.unwrap())
-        } else {
-            TimetableVariant::Unique
-        };
-
         let timestamp = UNIX_EPOCH + Duration::from_secs(update_time);
         let update_time = DateTime::<Utc>::from(timestamp);
 
@@ -152,7 +142,6 @@ impl TimetableProvider for SqliteProvider {
             };
 
             let group_id: String = row.get(7).unwrap();
-            error!("AAAA {:?}", group_id);
             Ok(Activity {
                 id: row.get(0).unwrap(),
                 name: row.get(1).unwrap(),
@@ -174,7 +163,7 @@ impl TimetableProvider for SqliteProvider {
         }).unwrap().collect();
 
         Some(Timetable {
-            descriptor: TimetableDescriptor::new(id, name, variant),
+            descriptor: TimetableDescriptor::new(id, name, db_to_variant(variant, variant_value)),
             activities: activities.unwrap(),
             update_time,
         })
@@ -182,11 +171,11 @@ impl TimetableProvider for SqliteProvider {
 
     fn namespaces(&self) -> Vec<String> {
         let connection = Connection::open("test.db").unwrap();
-        let mut prepared_timetable = connection.prepare(
-            "SELECT id FROM namespaces;"
+        let mut prepared_namespaces = connection.prepare(
+            "SELECT id FROM namespace;"
         ).unwrap();
 
-        let result: Result<Vec<String>, _> = prepared_timetable.query_map([], |row| {
+        let result: Result<Vec<String>, _> = prepared_namespaces.query_map([], |row| {
             Ok(row.get(0).unwrap())
         }).unwrap().collect();
 
@@ -194,13 +183,31 @@ impl TimetableProvider for SqliteProvider {
     }
 
     fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableDescriptor>> {
-        todo!()
+        let connection = Connection::open("test.db").unwrap();
+        let mut prepared_timetables = connection.prepare(
+            "SELECT namespace_id, timetable_id, name, variant, variant_value FROM timetable WHERE namespace_id = ?;"
+        ).unwrap();
+
+        let result: Result<Vec<TimetableDescriptor>, _> = prepared_timetables.query_map(params![
+            namespace
+        ], |row| {
+            Ok(TimetableDescriptor::new(
+                TimetableId::new(
+                    namespace.to_string(),
+                    row.get(1).unwrap()
+                ),
+                row.get(2).unwrap(),
+                db_to_variant(row.get(3).unwrap(), row.get(4).unwrap())
+            ))
+        }).unwrap().collect();
+
+        Some(result.unwrap())
     }
 }
 
 fn init_tables(connection: &Connection) -> Result<usize, Error> {
     connection.execute(
-        "CREATE TABLE IF NOT EXISTS namespaces(\
+        "CREATE TABLE IF NOT EXISTS namespace(\
                 id TEXT NOT NULL PRIMARY KEY\
             );",
         [],
@@ -208,10 +215,13 @@ fn init_tables(connection: &Connection) -> Result<usize, Error> {
     connection.execute(
         "CREATE TABLE IF NOT EXISTS timetable(\
                 id TEXT NOT NULL PRIMARY KEY,\
+                timetable_id TEXT NOT NULL,\
                 name TEXT NOT NULL,\
                 variant TEXT NOT NULL,\
                 variant_value INTEGER,\
-                update_time INTEGER NOT NULL\
+                update_time INTEGER NOT NULL,\
+                namespace_id TEXT NOT NULL,\
+                FOREIGN KEY(namespace_id) REFERENCES namespace(id)\
             );",
         [],
     )?;
@@ -246,7 +256,7 @@ fn insert_namespace(connection: &Connection, namespace: &str) {
     ).and_then(|mut statement|
         statement.execute(params![namespace])
     ) {
-        error!("Cannot insert namespace [{}]. This might not be a problem, but this namespace might not be visible. Details: {}", namespace, e)
+        error!("Cannot insert namespace [{}]. It might already exist, but it is not certain. Details: {}", namespace, e)
     }
 }
 
@@ -262,7 +272,8 @@ fn insert_timetable(statement: Statement, timetable: &Timetable) -> Result<usize
     };
 
     statement.execute(params![
-        id, timetable.descriptor.name, variant, variant_value, timetable.update_time.timestamp()
+        id, timetable.descriptor.id.id, timetable.descriptor.name, variant, variant_value,
+        timetable.update_time.timestamp(), timetable.descriptor.id.namespace
     ])
 }
 
@@ -296,4 +307,14 @@ fn insert_new_activities(statement: Statement, id: &TimetableId, activities: &[A
 
 fn as_db_id(timetable: &TimetableId) -> String {
     format!("{}_{}", timetable.namespace, timetable.id)
+}
+
+fn db_to_variant(variant: String, variant_value: Option<u32>) -> TimetableVariant {
+    if variant == "semester".to_string() {
+        TimetableVariant::Semester(variant_value.unwrap())
+    } else if variant == "year".to_string() {
+        TimetableVariant::Year(variant_value.unwrap())
+    } else {
+        TimetableVariant::Unique
+    }
 }
