@@ -15,7 +15,7 @@ pub struct Timetable {
     pub update_time: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq)]
 pub struct TimetableDescriptor {
     pub id: TimetableId,
     pub name: String,
@@ -28,7 +28,7 @@ pub struct TimetableId {
     pub id: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq)]
 pub enum TimetableVariant {
     Semester(u32),
     Year(u32),

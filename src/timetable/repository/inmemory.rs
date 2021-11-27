@@ -1,11 +1,11 @@
 use crate::timetable::repository::{TimetableConsumer, TimetableProvider, TimetableId};
 use std::sync::{Mutex, Arc};
 use crate::timetable::{Timetable, TimetableDescriptor};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
 pub struct InMemoryRepo {
-    local: Arc<Mutex<TimetableRepository>>
+    local: Arc<Mutex<TimetableRepository>>,
 }
 
 impl InMemoryRepo {
@@ -17,7 +17,7 @@ impl InMemoryRepo {
 #[derive(Clone)]
 struct TimetableRepository {
     timetables: HashMap<TimetableId, Timetable>,
-    available: HashMap<String, Vec<TimetableDescriptor>>,
+    available: HashMap<String, HashSet<TimetableDescriptor>>,
 }
 
 impl TimetableRepository {
@@ -34,10 +34,12 @@ impl TimetableRepository {
 
         self.timetables.insert(id, timetable);
 
-        if let Some(vec) = self.available.get_mut(&namespace) {
-            vec.push(descriptor);
+        if let Some(set) = self.available.get_mut(&namespace) {
+            set.insert(descriptor);
         } else {
-            self.available.insert(namespace, vec![descriptor]);
+            let mut set = HashSet::new();
+            set.insert(descriptor);
+            self.available.insert(namespace, set);
         }
     }
 
@@ -49,7 +51,7 @@ impl TimetableRepository {
         self.available.keys().cloned().into_iter().collect()
     }
 
-    pub fn available_timetables(&self, namespace: &str) -> Option<&Vec<TimetableDescriptor>> {
+    pub fn available_timetables(&self, namespace: &str) -> Option<&HashSet<TimetableDescriptor>> {
         self.available.get(namespace)
     }
 }
@@ -73,7 +75,9 @@ impl TimetableProvider for InMemoryRepo {
 
     fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableDescriptor>> {
         let repo = self.local.lock().unwrap();
-        repo.available_timetables(namespace).cloned()
+        repo.available_timetables(namespace).cloned().map(|set|
+            set.into_iter().collect()
+        )
     }
 }
 
