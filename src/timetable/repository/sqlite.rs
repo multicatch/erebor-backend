@@ -1,5 +1,8 @@
+mod load;
+
 use crate::timetable::repository::TimetableConsumer;
 use crate::timetable::{Timetable, TimetableVariant, TimetableId, ActivityOccurrence, Activity, TimetableDescriptor, ActivityGroup, ActivityTime, Weekday};
+use crate::timetable::repository::sqlite::load::load_from_db;
 use rusqlite::{params, Error, Statement, Connection};
 use std::sync::mpsc;
 use chrono::{Utc, DateTime};
@@ -11,7 +14,7 @@ pub fn sqlite() -> (SqliteConsumer, InMemoryRepo) {
     let (consumer, mut provider) = in_memory_repo();
     let (sender, receiver) = mpsc::channel();
     let connection = Connection::open("test.db").unwrap();
-    sync_with_db(&connection, &mut provider);
+    load_from_db(&connection, &mut provider).unwrap();
     listen_for_updates(connection, receiver);
 
     (SqliteConsumer::new(consumer, sender), provider)
@@ -210,114 +213,4 @@ fn db_to_variant(variant: String, variant_value: Option<u32>) -> TimetableVarian
     } else {
         TimetableVariant::Unique
     }
-}
-
-fn sync_with_db<T>(connection: &Connection, provider: &mut T) where T: TimetableConsumer {
-    // TODO: handle errors
-    let timetables: Vec<TimetableDescriptor> = available_timetables(connection).unwrap();
-
-    timetables.into_iter()
-        .map(|desc| get(connection, desc.id))
-        .for_each(|timetable| {
-            if let Some(t) = timetable {
-                provider.consume(t)
-            }
-        });
-}
-
-
-/// TODO: Refactor the following
-
-
-fn get(connection: &Connection, id: TimetableId) -> Option<Timetable> {
-    let mut prepared_timetable = connection.prepare(
-        "SELECT name, variant, variant_value, update_time FROM timetable WHERE id = ?;"
-    ).unwrap();
-
-    let timetable_id = as_db_id(&id);
-    let (name, variant, variant_value, update_time) = prepared_timetable.query_map(
-        params![
-            timetable_id
-        ], |row| {
-        Ok((row.get(0).unwrap(), row.get(1).unwrap(), row.get(2).unwrap(), row.get(3).unwrap()))
-    }).unwrap().next()?.unwrap();
-
-    let timestamp = UNIX_EPOCH + Duration::from_secs(update_time);
-    let update_time = DateTime::<Utc>::from(timestamp);
-
-    let mut activities = connection.prepare(
-        "SELECT activity_id,\
-                name,\
-                teacher,\
-                occurrence,\
-                occurrence_weekday,\
-                occurrence_date,\
-                group_symbol,\
-                group_id,\
-                group_name,\
-                group_number,\
-                start_time,\
-                end_time,\
-                duration,\
-                room FROM activity WHERE timetable_id = ?;"
-    ).unwrap();
-
-    let activities: Result<Vec<Activity>, _> = activities.query_map(params![
-            timetable_id
-        ], |row| {
-        let occurrence_type: String = row.get(3).unwrap();
-        let occurrence = if occurrence_type == *"special" {
-            ActivityOccurrence::Special {
-                date: row.get(5).unwrap()
-            }
-        } else {
-            let weekday: u8 = row.get(4).unwrap();
-            ActivityOccurrence::Regular {
-                weekday: Weekday::from(weekday)
-            }
-        };
-
-        let group_id: String = row.get(7).unwrap();
-        Ok(Activity {
-            id: row.get(0).unwrap(),
-            name: row.get(1).unwrap(),
-            teacher: row.get(2).unwrap(),
-            occurrence,
-            group: ActivityGroup {
-                symbol: row.get(6).unwrap(),
-                id: group_id.parse().unwrap(),
-                name: row.get(8).unwrap(),
-                number: row.get(9).unwrap(),
-            },
-            time: ActivityTime {
-                start_time: row.get(10).unwrap(),
-                end_time: row.get(11).unwrap(),
-                duration: row.get(12).unwrap(),
-            },
-            room: row.get(13).unwrap(),
-        })
-    }).unwrap().collect();
-
-    Some(Timetable {
-        descriptor: TimetableDescriptor::new(id, name, db_to_variant(variant, variant_value)),
-        activities: activities.unwrap(),
-        update_time,
-    })
-}
-
-fn available_timetables(connection: &Connection) -> Result<Vec<TimetableDescriptor>, Error> {
-    let mut prepared_timetables = connection.prepare(
-        "SELECT namespace_id, timetable_id, name, variant, variant_value FROM timetable;"
-    ).unwrap();
-
-    prepared_timetables.query_map(params![], |row| {
-        Ok(TimetableDescriptor::new(
-            TimetableId::new(
-                row.get(0).unwrap(),
-                row.get(1).unwrap()
-            ),
-            row.get(2).unwrap(),
-            db_to_variant(row.get(3).unwrap(), row.get(4).unwrap())
-        ))
-    }).unwrap().collect()
 }
