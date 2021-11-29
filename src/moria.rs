@@ -138,15 +138,14 @@ async fn fetch_activities(client: &MoriaClient, id: &str) -> Result<Vec<Activity
                 warn!("Moria timetable [{}]: Activity [{}] has empty event array and will be ignored.", id, wrapper.id);
             }
 
-            let empty = vec![];
-            let empty_students = wrapper.students_array.as_ref()
-                .unwrap_or_else(|| &empty)
-                .is_empty();
-            if empty_students {
+            let students_empty = wrapper.students_array.as_ref()
+                .map(|students| students.is_empty())
+                .unwrap_or(true);
+            if students_empty {
                 warn!("Moria timetable [{}]: Activity [{}] has empty student list and will be ignored.", id, wrapper.id);
             }
 
-            !empty_array && !empty_students
+            !empty_array && !students_empty
         })
         .map(|wrapper| {
             let event = wrapper.event_array.get(0).unwrap();
@@ -181,7 +180,7 @@ fn to_activity(wrapper: &MoriaEventWrapper, event: &MoriaEvent, teacher: Option<
             symbol: wrapper.kind.shortcut.clone(),
             name: wrapper.kind.name.clone(),
             id: wrapper.kind.id,
-            number: group.clone(),
+            number: group,
         },
         time: ActivityTime {
             start_time: event.start_time.clone(),
@@ -219,9 +218,9 @@ fn parse_variant(name: String) -> (String, TimetableVariant) {
         .unwrap_or(false) {
 
         let year = name.chars()
-            .nth(0)
-            .unwrap()
-            .to_digit(10);
+            .next()
+            .map(|c| c.to_digit(10))
+            .flatten();
 
         if let Some(year) = year {
             return (name[2..].trim().to_string(), TimetableVariant::Year(year))
