@@ -6,8 +6,6 @@ use std::process::exit;
 
 pub fn listen_for_db_updates(connection: Connection, receiver: Receiver<Timetable>) {
     tokio::spawn(async move {
-        info!("Initializing SQLite tables...");
-        init_tables(&connection).unwrap();
         info!("Starting SQLite persist task...");
         loop {
             match receiver.recv() {
@@ -19,51 +17,6 @@ pub fn listen_for_db_updates(connection: Connection, receiver: Receiver<Timetabl
             };
         }
     });
-}
-
-fn init_tables(connection: &Connection) -> Result<usize, Error> {
-    connection.execute(
-        "CREATE TABLE IF NOT EXISTS namespace(\
-                id TEXT NOT NULL PRIMARY KEY\
-            );",
-        [],
-    )?;
-    connection.execute(
-        "CREATE TABLE IF NOT EXISTS timetable(\
-                id TEXT NOT NULL PRIMARY KEY,\
-                timetable_id TEXT NOT NULL,\
-                name TEXT NOT NULL,\
-                variant TEXT NOT NULL,\
-                variant_value INTEGER,\
-                update_time INTEGER NOT NULL,\
-                namespace_id TEXT NOT NULL,\
-                FOREIGN KEY(namespace_id) REFERENCES namespace(id)\
-            );",
-        [],
-    )?;
-    connection.execute(
-        "
-            CREATE TABLE IF NOT EXISTS activity(\
-                id TEXT NOT NULL PRIMARY KEY,\
-                activity_id TEXT NOT NULL,\
-                timetable_id TEXT NOT NULL,\
-                name TEXT NOT NULL,\
-                teacher TEXT,\
-                occurrence TEXT NOT NULL,\
-                occurrence_weekday INTEGER,\
-                occurrence_date TEXT,\
-                group_symbol TEXT NOT NULL,\
-                group_id TEXT NOT NULL,\
-                group_name TEXT NOT NULL,\
-                group_number TEXT,\
-                start_time TEXT NOT NULL,\
-                end_time TEXT NOT NULL,\
-                duration TEXT NOT NULL,\
-                room TEXT,\
-                FOREIGN KEY(timetable_id) REFERENCES timetable(id)\
-            );",
-        [],
-    )
 }
 
 fn insert(connection: &Connection, timetable: Timetable) {
@@ -150,9 +103,10 @@ fn insert_new_activities(statement: Statement, id: &TimetableId, activities: &[A
     activities.iter().try_for_each(|activity| {
         let (occurrence, occurrence_weekday, occurrence_date) = occurrence_to_db(&activity.occurrence);
 
-        let activity_id = format!("{}_{}", id.namespace, activity.id);
+        let timetable_id = as_db_id(id);
+        let activity_id = format!("{}_{}", timetable_id, activity.id);
         statement.execute(params![
-                activity_id, activity.id, as_db_id(id),
+                activity_id, activity.id, timetable_id,
                 activity.name, activity.teacher, occurrence, occurrence_weekday, occurrence_date,
                 activity.group.symbol, activity.group.id, activity.group.name, activity.group.number,
                 activity.time.start_time, activity.time.end_time, activity.time.duration, activity.room
