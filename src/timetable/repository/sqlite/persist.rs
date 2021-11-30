@@ -1,7 +1,7 @@
-use crate::timetable::{Timetable, TimetableVariant, TimetableId, ActivityOccurrence, Activity};
+use crate::timetable::{Timetable, TimetableId, Activity};
 use rusqlite::{params, Error, Statement, Connection};
 use std::sync::mpsc::Receiver;
-use crate::timetable::repository::sqlite::as_db_id;
+use crate::timetable::repository::sqlite::{as_db_id, variant_to_db, occurrence_to_db};
 use std::process::exit;
 
 pub fn listen_for_db_updates(connection: Connection, receiver: Receiver<Timetable>) {
@@ -126,11 +126,7 @@ fn insert_timetable(statement: Statement, timetable: &Timetable) -> Result<usize
 
     let id = as_db_id(&timetable.descriptor.id);
 
-    let (variant, variant_value) = match timetable.descriptor.variant {
-        TimetableVariant::Semester(semester) => ("semester", Some(semester as i64)),
-        TimetableVariant::Year(year) => ("year", Some(year as i64)),
-        TimetableVariant::Unique => ("unique", None),
-    };
+    let (variant, variant_value) = variant_to_db(&timetable.descriptor.variant);
 
     statement.execute(params![
         id, timetable.descriptor.id.id, timetable.descriptor.name, variant, variant_value,
@@ -152,10 +148,7 @@ fn insert_new_activities(statement: Statement, id: &TimetableId, activities: &[A
     let mut statement = statement;
 
     activities.iter().try_for_each(|activity| {
-        let (occurrence, occurrence_weekday, occurrence_date) = match activity.occurrence.clone() {
-            ActivityOccurrence::Regular { weekday } => ("regular", Some(u8::from(weekday)), None),
-            ActivityOccurrence::Special { date } => ("special", None, Some(date)),
-        };
+        let (occurrence, occurrence_weekday, occurrence_date) = occurrence_to_db(&activity.occurrence);
 
         let activity_id = format!("{}_{}", id.namespace, activity.id);
         statement.execute(params![

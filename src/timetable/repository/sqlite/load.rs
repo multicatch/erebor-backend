@@ -3,8 +3,8 @@ use std::time::{Duration, UNIX_EPOCH};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, Error, params, Row};
 
-use crate::timetable::{Activity, ActivityGroup, ActivityOccurrence, ActivityTime, Timetable, TimetableDescriptor, TimetableId, Weekday};
-use crate::timetable::repository::sqlite::{as_db_id, db_to_variant};
+use crate::timetable::{Activity, ActivityGroup, ActivityTime, Timetable, TimetableDescriptor, TimetableId};
+use crate::timetable::repository::sqlite::{as_db_id, db_to_variant, db_to_occurrence};
 use crate::timetable::repository::TimetableConsumer;
 
 pub fn load_from_db<T>(connection: &Connection, provider: &mut T) -> Result<usize, Error>
@@ -25,13 +25,14 @@ fn fetch_available_timetables(connection: &Connection) -> Result<Vec<TimetableDe
     )?;
 
     prepared_timetables.query_map(params![], |row| {
+        let variant: String = row.get(3)?;
         Ok(TimetableDescriptor::new(
             TimetableId::new(
                 row.get(0)?,
                 row.get(1)?,
             ),
             row.get(2)?,
-            db_to_variant(row.get(3)?, row.get(4)?),
+            db_to_variant(&variant, row.get(4)?).unwrap(),
         ))
     }).unwrap().collect()
 }
@@ -107,27 +108,27 @@ fn fetch_descriptor_and_update_date(connection: &Connection, id: TimetableId) ->
     }
 
     let (name, variant, variant_value, update_time) = query_result.unwrap()?;
+    let variant: String = variant;
 
     let timestamp = UNIX_EPOCH + Duration::from_secs(update_time);
     let update_time = DateTime::<Utc>::from(timestamp);
 
-    let descriptor = TimetableDescriptor::new(id, name, db_to_variant(variant, variant_value));
+    let descriptor = TimetableDescriptor::new(
+        id,
+        name,
+        db_to_variant(&variant, variant_value).unwrap()
+    );
 
     Ok(Some((descriptor, update_time)))
 }
 
 fn try_create_activity(row: &Row) -> Result<Activity, Error> {
-    let occurrence_type: String = row.get(3)?;
-    let occurrence = if occurrence_type == *"special" {
-        ActivityOccurrence::Special {
-            date: row.get(5)?
-        }
-    } else {
-        let weekday: u8 = row.get(4)?;
-        ActivityOccurrence::Regular {
-            weekday: Weekday::from(weekday)
-        }
-    };
+    let occurrence_kind: String = row.get(3)?;
+    let occurrence = db_to_occurrence(
+        &occurrence_kind,
+        row.get(4)?,
+        row.get(5)?
+    ).ok_or(Error::InvalidColumnIndex(3))?;
 
     let group_id: String = row.get(7)?;
     Ok(Activity {
