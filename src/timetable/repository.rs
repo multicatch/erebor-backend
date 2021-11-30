@@ -6,6 +6,7 @@ use crate::timetable::{Timetable, TimetableId, TimetableDescriptor};
 use std::sync::Arc;
 
 pub mod inmemory;
+pub mod sqlite;
 
 #[derive(Clone)]
 pub struct ShareableTimetableProvider {

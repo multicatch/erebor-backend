@@ -1,11 +1,12 @@
 use erebor_backend::run_scheduler;
 use erebor_backend::timetable::repository::{ShareableTimetableProvider};
 use log::LevelFilter;
-use erebor_backend::timetable::repository::inmemory::in_memory_repo;
 use erebor_backend::timetable::api::{get_all_namespaces, get_all_timetables, get_timetable};
 use rocket::{routes, Request, Response};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
+use erebor_backend::timetable::repository::sqlite::create_sqlite;
+use rusqlite::Connection;
 
 #[rocket::main]
 async fn main() {
@@ -15,7 +16,9 @@ async fn main() {
         .filter_module("reqwest", LevelFilter::Debug)
         .init();
 
-    let repository = run_scheduler(in_memory_repo).unwrap();
+
+    let connection = Connection::open("erebor.db").unwrap();
+    let repository = run_scheduler(move || create_sqlite(connection)).unwrap();
 
     let result = rocket::build()
         .manage(ShareableTimetableProvider::new(repository))
