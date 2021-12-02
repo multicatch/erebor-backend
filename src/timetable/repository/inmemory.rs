@@ -1,15 +1,15 @@
 use crate::timetable::repository::{TimetableConsumer, TimetableProvider, TimetableId};
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, RwLock};
 use crate::timetable::{Timetable, TimetableDescriptor};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
 pub struct InMemoryRepo {
-    local: Arc<Mutex<TimetableRepository>>,
+    local: Arc<RwLock<TimetableRepository>>,
 }
 
 impl InMemoryRepo {
-    fn new(repo: Arc<Mutex<TimetableRepository>>) -> InMemoryRepo {
+    fn new(repo: Arc<RwLock<TimetableRepository>>) -> InMemoryRepo {
         InMemoryRepo { local: repo }
     }
 }
@@ -64,17 +64,17 @@ impl Default for TimetableRepository {
 
 impl TimetableProvider for InMemoryRepo {
     fn get(&self, id: TimetableId) -> Option<Timetable> {
-        let guard = self.local.lock().unwrap();
+        let guard = self.local.read().unwrap();
         guard.get(id).cloned()
     }
 
     fn namespaces(&self) -> Vec<String> {
-        let repo = self.local.lock().unwrap();
+        let repo = self.local.read().unwrap();
         repo.namespaces()
     }
 
     fn available_timetables(&self, namespace: &str) -> Option<Vec<TimetableDescriptor>> {
-        let repo = self.local.lock().unwrap();
+        let repo = self.local.read().unwrap();
         repo.available_timetables(namespace).cloned().map(|set|
             set.into_iter().collect()
         )
@@ -83,14 +83,14 @@ impl TimetableProvider for InMemoryRepo {
 
 impl TimetableConsumer for InMemoryRepo {
     fn consume(&mut self, timetable: Timetable) {
-        self.local.lock().unwrap().insert(timetable.descriptor.id.clone(), timetable)
+        self.local.write().unwrap().insert(timetable.descriptor.id.clone(), timetable)
     }
 }
 
 pub fn in_memory_repo() -> (InMemoryRepo, InMemoryRepo) {
     debug!("Creating in memory repository for timetable.");
     let repository = TimetableRepository::new();
-    let repo_arc = Arc::new(Mutex::new(repository));
+    let repo_arc = Arc::new(RwLock::new(repository));
     let consumer = InMemoryRepo::new(repo_arc.clone());
     let provider = InMemoryRepo::new(repo_arc);
     (consumer, provider)
