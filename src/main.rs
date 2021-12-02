@@ -2,11 +2,10 @@ use erebor_backend::run_scheduler;
 use erebor_backend::timetable::repository::{ShareableTimetableProvider};
 use log::LevelFilter;
 use erebor_backend::timetable::api::{get_all_namespaces, get_all_timetables, get_timetable};
-use rocket::{routes, Request, Response};
-use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::Header;
+use rocket::routes;
 use erebor_backend::timetable::repository::sqlite::create_sqlite;
 use rusqlite::Connection;
+use erebor_backend::cors::Cors;
 
 #[rocket::main]
 async fn main() {
@@ -23,40 +22,12 @@ async fn main() {
     let result = rocket::build()
         .manage(ShareableTimetableProvider::new(repository))
         .mount("/", routes![get_all_namespaces, get_all_timetables, get_timetable])
-        .attach(Cors::default())
+        .attach(Cors::new(&[], "https://erebor.vpcloud.eu".to_string()))
         .launch()
         .await;
 
     match result {
         Ok(_) => println!("Server finished normally."),
         Err(e) => eprintln!("Server crashed. {}", e),
-    }
-}
-
-struct Cors {
-    allowed_origins: Vec<String>
-}
-
-impl Default for Cors {
-    fn default() -> Cors {
-        Cors {
-           allowed_origins: vec![
-               "https://erebor.vpcloud.eu".to_string()
-           ]
-        }
-    }
-}
-
-#[rocket::async_trait]
-impl Fairing for Cors {
-    fn info(&self) -> Info {
-        Info {
-            name: "CORS",
-            kind: Kind::Response
-        }
-    }
-
-    async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
-        res.set_header(Header::new("Access-Control-Allow-Origin", self.allowed_origins.join(", ")));
     }
 }

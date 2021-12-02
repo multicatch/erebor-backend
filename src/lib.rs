@@ -18,6 +18,7 @@ use crate::timetable::Timetable;
 pub mod timetable;
 pub mod httpclient;
 mod moria;
+pub mod cors;
 
 pub fn run_scheduler<F, C, P>(repo: F) -> Result<P, SchedulingError>
     where F: FnOnce() -> (C, P),
